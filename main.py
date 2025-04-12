@@ -1,7 +1,3 @@
-from locale import windows_locale
-
-from selenium.common import TimeoutException
-from selenium.webdriver.common.devtools.v135.dom import move_to
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -24,6 +20,7 @@ def parseCost(costText):
             nbr += toParse[j]
     return float(nbr)
 
+
 merchants = {}
 prices = {}
 cards = {}
@@ -32,6 +29,7 @@ f = open("cards.txt", "r")
 lines = f.readlines()
 line_nbr = 0
 
+
 def main(line_nbr):
     service = ChromeService(executable_path=ChromeDriverManager().install())
 
@@ -39,11 +37,6 @@ def main(line_nbr):
     options.add_argument("--start-maximized")
     driver = webdriver.Chrome(options=options, service=service)
     driver.get("https://www.cardmarket.com/en/Magic")
-
-    """with open("save_names.pkl", "rb") as f:
-        merchants = dill.load(f)
-    with open("save_prices.pkl", "rb") as f:
-        prices = dill.load(f)"""
 
     while line_nbr < len(lines):
         """Parse data"""
@@ -77,7 +70,7 @@ def main(line_nbr):
             article = driver.find_element(by=By.CSS_SELECTOR, value=".col-12.col-md-8.px-2.flex-column a")
             article.click()
         except:
-            pass
+            print("error 429 ? (1)")
 
         sleep(3)  # to avoid error 429 (too many requests in a short time)
 
@@ -86,9 +79,9 @@ def main(line_nbr):
             WebDriverWait(driver, timeout=3).until(
                 EC.element_to_be_clickable((By.CLASS_NAME, "fonticon-filter.cursor-pointer")))  # wait for page to load
             filterToggle = driver.find_element(by=By.CLASS_NAME, value="fonticon-filter.cursor-pointer")
-            filterToggle.click()
+            driver.execute_script("arguments[0].click();", filterToggle)
         except:
-            print("error 429 ?")
+            print("error 429 ? (2)")
             pass
 
         sleep(3)  # to avoid error 429 (too many requests in a short time)
@@ -96,7 +89,7 @@ def main(line_nbr):
         WebDriverWait(driver, timeout=10).until(
             EC.element_to_be_clickable((By.ID, "FilterForm")))  # wait for page to load
 
-        #click() doesn't work  for wathever reason
+        # click() doesn't work  for wathever reason
         try:
             proSellerFilter = driver.find_element(by=By.NAME, value="sellerType[1]")
             if not proSellerFilter.is_selected():
@@ -115,7 +108,7 @@ def main(line_nbr):
 
         sleep(3)  # to avoid error 429 (too many requests in a short time)
 
-        #english is always available
+        # english is always available
         englishFilter = driver.find_element(by=By.NAME, value="language[1]")
         if not englishFilter.is_selected():
             driver.execute_script("arguments[0].click();", englishFilter)
@@ -140,7 +133,7 @@ def main(line_nbr):
 
         applyButton = driver.find_element(by=By.NAME, value="apply")
         driver.execute_script("arguments[0].click();", applyButton)
-        #applyButton.click()
+        # applyButton.click()
 
         """Get all corresponding items"""
         for i in range(5):
@@ -150,7 +143,8 @@ def main(line_nbr):
                 more = driver.find_element(by=By.ID, value="loadMore")
                 driver.execute_script("arguments[0].click();", more)
                 sleep(1)  # wait for page to load
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # force load new items by scrolling down the page
+                driver.execute_script(
+                    "window.scrollTo(0, document.body.scrollHeight);")  # force load new items by scrolling down the page
             except:
                 print("Skipped show more results")
                 break
@@ -191,6 +185,7 @@ def main(line_nbr):
             print(f"An error as occured on {line}")
             pass"""
     driver.quit()
+
 
 while line_nbr < len(lines):
     try:

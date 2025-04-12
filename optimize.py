@@ -8,6 +8,8 @@ with open("save_prices.pkl", "rb") as f:
 with open("save_cards.pkl", "rb") as f:
     cards = pickle.load(f)
 
+print(cards)
+
 def mycmp(a, b):
     return len(a[1]) - len(b[1])
 """    if len(a[1]) < len(b[1]):
@@ -23,7 +25,7 @@ best_prices = {}
 def get_best():
     for card in cards:
         for seller in cards[card]:
-            if seller in {"CrowsArena", "Filipe-Raq56"}: # doesn't ship to belgium
+            if seller in {"CrowsArena", "Filipe-Raq56", "LGRMasterC"}: # doesn't ship to belgium
                 continue
             if seller not in best_sellers:
                 best_sellers[seller] = []
