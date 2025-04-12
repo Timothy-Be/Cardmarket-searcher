@@ -1,3 +1,7 @@
+from locale import windows_locale
+
+from selenium.common import TimeoutException
+from selenium.webdriver.common.devtools.v135.dom import move_to
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -7,148 +11,198 @@ from selenium.webdriver.support.select import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
+import dill
 
-service = ChromeService(executable_path=ChromeDriverManager().install())
 
-options = ChromeOptions()
-driver = webdriver.Chrome(options=options, service=service)
-driver.get("https://www.cardmarket.com/en/Magic")
+def parseCost(costText):
+    toParse = costText[:len(costText) - 2]
+    nbr = ""
+    for j in range(len(toParse)):
+        if toParse[j] == ',':
+            nbr += '.'
+        elif toParse[j] != '.':
+            nbr += toParse[j]
+    return float(nbr)
 
-cards = {}
+merchants = {}
 prices = {}
+cards = {}
 
 f = open("cards.txt", "r")
-for line in f:
-    #try:
-    """Parse data"""
-    item = ""
-    for c in line:
-        if c == '(':
-            break
-        if c.isalpha() or c == ' ':
-            item += c
-    item = item.strip()
-    if item == "deck" or item == "Deck" or item == "" or item == "\n" or item == "Sideboard":
-        continue
+lines = f.readlines()
+line_nbr = 0
 
-    sleep(3)  # to avoid error 429 (too many requests in a short time)
+def main(line_nbr):
+    service = ChromeService(executable_path=ChromeDriverManager().install())
 
-    """Find item"""
-    searchBox = driver.find_element(by=By.ID, value="ProductSearchInput")
-    searchButton = driver.find_element(by=By.ID, value="search-btn")
+    options = ChromeOptions()
+    options.add_argument("--start-maximized")
+    driver = webdriver.Chrome(options=options, service=service)
+    driver.get("https://www.cardmarket.com/en/Magic")
 
-    searchBox.send_keys(item)
-    searchButton.click()
+    """with open("save_names.pkl", "rb") as f:
+        merchants = dill.load(f)
+    with open("save_prices.pkl", "rb") as f:
+        prices = dill.load(f)"""
 
-    try:
-        WebDriverWait(driver, timeout=3).until(EC.element_to_be_clickable(
-            (By.CSS_SELECTOR, ".col-12.col-md-8.px-2.flex-column a")))  # wait for page to load
-        article = driver.find_element(by=By.CSS_SELECTOR, value=".col-12.col-md-8.px-2.flex-column a")
-        article.click()
-    except:
-        pass
+    while line_nbr < len(lines):
+        """Parse data"""
+        line = lines[line_nbr]
+        item = ""
+        for c in line:
+            if c == '(':
+                break
+            if c.isalpha() or c == ' ':
+                item += c
+        item = item.strip()
+        if item == "deck" or item == "Deck" or item == "" or item == "\n" or item == "Sideboard":
+            line_nbr += 1
+            continue
 
-    """Setup filter for search"""
-    try:
-        WebDriverWait(driver, timeout=3).until(
-            EC.element_to_be_clickable((By.CLASS_NAME, "fonticon-filter")))  # wait for page to load
-        filterToggle = driver.find_element(by=By.CLASS_NAME, value="fonticon-filter")
-        filterToggle.click()
-    except:
-        print("error 429 ?")
-        pass
+        print(item)
+        cards[item] = {}
 
-    WebDriverWait(driver, timeout=3).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, ".custom-control.custom-checkbox")))  # wait for page to load
+        sleep(3)  # to avoid error 429 (too many requests in a short time)
 
-    #click() doesn't work  for wathever reason
-    try:
-        proSellerFilter = driver.find_element(by=By.NAME, value="sellerType[1]")
-        if not proSellerFilter.is_selected():
-            driver.execute_script("arguments[0].click();", proSellerFilter)
-    except:
-        print(f"Pro Seller not available for {line}")
-    try:
-        powerSellerFilter = driver.find_element(by=By.NAME, value="sellerType[2]")
-        if not powerSellerFilter.is_selected():
-            driver.execute_script("arguments[0].click();", powerSellerFilter)
-    except:
-        print(f"Power Seller not available for {line}")
+        """Find item"""
+        searchBox = driver.find_element(by=By.ID, value="ProductSearchInput")
+        searchButton = driver.find_element(by=By.ID, value="search-btn")
 
-    #english is always available
-    englishFilter = driver.find_element(by=By.NAME, value="language[1]")
-    if not englishFilter.is_selected():
-        driver.execute_script("arguments[0].click();", englishFilter)
-    try:
-        frenchFilter = driver.find_element(by=By.NAME, value="language[2]")
-        if not frenchFilter.is_selected():
-            driver.execute_script("arguments[0].click();", frenchFilter)
-    except:
-        print(f"French not available for {line}")
+        searchBox.send_keys(item)
+        searchButton.click()
 
-    conditionFilter = driver.find_element(by=By.NAME, value="minCondition")
-    selectCondition = Select(conditionFilter)
-    selectCondition.select_by_visible_text("Excellent")
+        try:
+            WebDriverWait(driver, timeout=3).until(EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, ".col-12.col-md-8.px-2.flex-column a")))  # wait for page to load
+            article = driver.find_element(by=By.CSS_SELECTOR, value=".col-12.col-md-8.px-2.flex-column a")
+            article.click()
+        except:
+            pass
 
-    applyButton = driver.find_element(by=By.NAME, value="apply")
-    applyButton.click()
+        sleep(3)  # to avoid error 429 (too many requests in a short time)
 
-    """Get all corresponding items"""
-    for i in range(5):
+        """Setup filter for search"""
         try:
             WebDriverWait(driver, timeout=3).until(
-                EC.element_to_be_clickable((By.ID, "loadMore")))  # wait for page to load
-            more = driver.find_element(by=By.ID, value="loadMore")
-            more.click()
-            sleep(0.5)  # wait for page to load
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # force load new items by scrolling down the page
+                EC.element_to_be_clickable((By.CLASS_NAME, "fonticon-filter.cursor-pointer")))  # wait for page to load
+            filterToggle = driver.find_element(by=By.CLASS_NAME, value="fonticon-filter.cursor-pointer")
+            filterToggle.click()
         except:
-            break
+            print("error 429 ?")
+            pass
 
-    names = driver.find_elements(by=By.CLASS_NAME, value="d-flex.has-content-centered.mr-1")
-    costs = driver.find_elements(by=By.CLASS_NAME, value="font-weight-bold.color-primary.small.text-right.text-nowrap")
+        sleep(3)  # to avoid error 429 (too many requests in a short time)
 
-    """Get rid of all '' values"""
-    namesText = []
-    costsText = []
-    for i in range(len(names)):
-        if names[i].text != '':
-            namesText.append(names[i].text)
-    for i in range(len(costs)):
-        if costs[i].text != '':
-            costsText.append(costs[i].text)
+        WebDriverWait(driver, timeout=10).until(
+            EC.element_to_be_clickable((By.ID, "FilterForm")))  # wait for page to load
 
-    """Add elements to dictionaries"""
-    for i in range(len(namesText)):
-        if namesText[i] not in cards:
-            cards[namesText[i]] = [item]
+        #click() doesn't work  for wathever reason
+        try:
+            proSellerFilter = driver.find_element(by=By.NAME, value="sellerType[1]")
+            if not proSellerFilter.is_selected():
+                driver.execute_script("arguments[0].click();", proSellerFilter)
+        except:
+            print(f"Pro Seller not available for {line}")
 
-            toParse = costsText[i][:len(costsText[i]) - 2]
-            nbr = ""
-            for j in range(len(toParse)):
-                if toParse[j] == ',':
-                    nbr += '.'
-                elif toParse[j] != '.':
-                    nbr += toParse[j]
-            prices[namesText[i]] = float(nbr)
+        sleep(3)  # to avoid error 429 (too many requests in a short time)
 
-        elif item not in cards[namesText[i]]:
-            cards[namesText[i]].append(item)
+        try:
+            powerSellerFilter = driver.find_element(by=By.NAME, value="sellerType[2]")
+            if not powerSellerFilter.is_selected():
+                driver.execute_script("arguments[0].click();", powerSellerFilter)
+        except:
+            print(f"Power Seller not available for {line}")
 
-            toParse = costsText[i][:len(costsText[i]) - 2]
-            nbr = ""
-            for j in range(len(toParse)):
-                if toParse[j] == ',':
-                    nbr += '.'
-                elif toParse[j] != '.':
-                    nbr += toParse[j]
-            prices[namesText[i]] += float(nbr)
+        sleep(3)  # to avoid error 429 (too many requests in a short time)
 
-    """except Exception as e:
-        print(f"An error as occured on {line}")
-        pass"""
+        #english is always available
+        englishFilter = driver.find_element(by=By.NAME, value="language[1]")
+        if not englishFilter.is_selected():
+            driver.execute_script("arguments[0].click();", englishFilter)
+        try:
+            frenchFilter = driver.find_element(by=By.NAME, value="language[2]")
+            if not frenchFilter.is_selected():
+                driver.execute_script("arguments[0].click();", frenchFilter)
+        except:
+            print(f"French not available for {line}")
 
-l1 = sorted(cards.items(), key=lambda k: len(k[1]), reverse=True)[:10]
+        sleep(3)  # to avoid error 429 (too many requests in a short time)
+
+        minCondFilter = driver.find_element(by=By.XPATH, value='//span[text()="Min. Condition"]')
+        if not minCondFilter.is_selected():
+            driver.execute_script("arguments[0].click();", minCondFilter)
+
+        sleep(3)  # to avoid error 429 (too many requests in a short time)
+
+        conditionFilter = driver.find_element(by=By.NAME, value="minCondition")
+        selectCondition = Select(conditionFilter)
+        selectCondition.select_by_visible_text("Excellent")
+
+        applyButton = driver.find_element(by=By.NAME, value="apply")
+        driver.execute_script("arguments[0].click();", applyButton)
+        #applyButton.click()
+
+        """Get all corresponding items"""
+        for i in range(5):
+            try:
+                WebDriverWait(driver, timeout=3).until(
+                    EC.element_to_be_clickable((By.ID, "loadMore")))  # wait for page to load
+                more = driver.find_element(by=By.ID, value="loadMore")
+                driver.execute_script("arguments[0].click();", more)
+                sleep(1)  # wait for page to load
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # force load new items by scrolling down the page
+            except:
+                print("Skipped show more results")
+                break
+
+        names = driver.find_elements(by=By.CLASS_NAME, value="d-flex.has-content-centered.me-1")
+        costs = driver.find_elements(by=By.CLASS_NAME, value="color-primary.small.text-end.text-nowrap.fw-bold")
+
+        """Get rid of all '' values"""
+        namesText = []
+        costsText = []
+        for i in range(len(names)):
+            if names[i].text != '':
+                namesText.append(names[i].text)
+        for i in range(len(costs)):
+            if costs[i].text != '':
+                costsText.append(costs[i].text)
+
+        """Add elements to dictionaries"""
+        for i in range(len(namesText)):
+            cards[item][namesText[i]] = parseCost(costsText[i])
+            if namesText[i] not in merchants:
+                merchants[namesText[i]] = [item]
+
+            elif item not in merchants[namesText[i]]:
+                merchants[namesText[i]].append(item)
+
+            prices[namesText[i]] = parseCost(costsText[i])
+
+        with open("save_names.pkl", "wb") as file:
+            dill.dump(merchants, file)
+        with open("save_prices.pkl", "wb") as file:
+            dill.dump(prices, file)
+        with open("save_cards.pkl", "wb") as file:
+            dill.dump(cards, file)
+
+        line_nbr += 1
+        """except Exception as e:
+            print(f"An error as occured on {line}")
+            pass"""
+    driver.quit()
+
+while line_nbr < len(lines):
+    try:
+        main(line_nbr)
+    except:
+        print("restart")
+        continue
+    break
+
+f.close()
+
+l1 = sorted(merchants.items(), key=lambda k: len(k[1]), reverse=True)[:10]
 if len(l1) > 0:
     print(len(l1[0][1]))
 print(l1)
@@ -157,4 +211,4 @@ for t in l1:
     l2.append((t[0], prices[t[0]]))
 print(l2)
 
-driver.quit()
+print(cards)
